@@ -11,10 +11,12 @@ from tkinter import *
 from tkinter import ttk
 import logging
 import webbrowser
-
+import time
 
 # add filemode="w" to overwrite
-logging.basicConfig(filename="sova.log", level=logging.INFO) 
+
+logging.basicConfig(filename="sova.log", level=logging.INFO, format = "%(asctime)s %(levelname)s - %(message)s") 
+
 #logging.debug("")
 #logging.info("")
 #logging.error("")
@@ -39,71 +41,82 @@ class Volunteer():
     def getInfo(self):
         return self.info
     def getDepartament(self):
-        return self.departament
-        
+        return self.departament       
+
+def errorFrame(errorText):
+    errorF = Toplevel()
+    errorF.title("Error")
+    errorF.geometry("300x100")
+    def closeThisErrorFrame():
+       errorF.destroy() 
+    labelVersionData = Label(errorF,
+                             text=("Ваши последние действия привели\n к возникновению ошибки: \n" + errorText))
+    labelVersionData.pack(fill=BOTH, padx=5, pady=5)
+    button_accept = Button(errorF, text = 'Ok', command = closeThisErrorFrame)
+    button_accept.pack(padx=5, pady=5)
+    
 
 class datBaseConnector():
     def __init__(self): 
         logging.info("init connection")
-        self.conn = sqlite3.connect('SovaVolunteeres.sqlite', timeout=10)
+        self.conn = sqlite3.connect('SovaVolunteeres.sqlite', timeout=100)
         self.cursor = self.conn.cursor()
-        self.creator()
+        self.creator()      
+    
+    def execute(self, query, param = None):
+        logging.info(query + " " + (str(param)))
+        try:
+            if param == None:
+                self.cursor.execute(query)
+            else:
+                self.cursor.execute(query, param)
+                self.conn.commit()
+        except Exception as err:
+            logging.error('execute failed: %s : %s' % (query, str(err)))
+            errorFrame(str(err))
+        cursorT = self.cursor
+        return cursorT
         
     def creator(self):
-        self.cursor.execute("""create table if not exists human_resources
+        self.execute("""create table if not exists human_resources
                    (id integer primary key autoincrement,
                    full_name text not null,
                    callsign text,
                    additional_information text,
                    departament text,
                    CONSTRAINT constraint_name UNIQUE(callsign))""") 
-        self.cursor.execute("""create table if not exists empty_callsign
+        self.execute("""create table if not exists empty_callsign
                    (id integer primary key autoincrement,
                    callsign text not null,
                    CONSTRAINT constraint_name UNIQUE(callsign))""")
         
     def selectAllVolunteeres(self): 
         stringToExec = "select full_Name from human_resources"
-        self.cursor.execute(stringToExec)
-        logging.info("selectAllVolunteeres: " + stringToExec)
-        return self.stringArrConstructor()
-    
+        return self.stringArrConstructor(self.execute(stringToExec))
     
     def insertNewVolunteer(self, insertData):
         stringToExec = "insert into human_resources values(NULL,?,?,?,?)"
-        logging.info("insertNewVolunteer: " + stringToExec + str(insertData))
-        self.cursor.execute(stringToExec, insertData)
-        self.conn.commit()
+        self.execute(stringToExec, insertData)
         
     def isertNick(self, nick):
         stringToExec = "insert into empty_callsign values(NULL, '" + nick + "')"
-        logging.info("isertNick: " + stringToExec)
-        self.cursor.execute(stringToExec)
-        self.conn.commit()
+        self.execute(stringToExec)
             
     def emptyNick(self, checkNick):
         stringToExec = "select * from empty_callsign where callsign = '" + checkNick + "'"
-        logging.info("emptyNick: " + stringToExec)
-        self.cursor.execute(stringToExec)
-        return self.cursor.fetchone()
+        return self.execute(stringToExec).fetchone()
     
     def deleteNick(self, nick):
         stringToExec = "delete from empty_callsign where callsign = '" + nick + "'"
-        logging.info("deleteNick: " + stringToExec)
-        self.cursor.execute(stringToExec)
-        self.conn.commit()
+        self.execute(stringToExec)
     
     def selectAllUniqDepartaments(self):
         stringToExec = "select distinct departament from human_resources"
-        logging.info("selectAllUniqDepartaments: " + stringToExec)
-        self.cursor.execute(stringToExec)
-        return self.stringArrConstructor()
+        return self.stringArrConstructor(self.execute(stringToExec))
     
     def selectByName(self, userName): 
         stringToExec = "select full_name, callsign, additional_information from human_resources where full_name = '" + userName + "'"
-        logging.info("selectByName: " + stringToExec)
-        self.cursor.execute(stringToExec)
-        return self.stringArrConstructor()
+        return self.stringArrConstructor(self.execute(stringToExec))
     
     def updateVolunteer(self, sovaVolont):
         stringToExec = "update human_resources set full_name = '"  + sovaVolont.getName() + "', "
@@ -111,51 +124,39 @@ class datBaseConnector():
         stringToExec += "additional_information = '"  + sovaVolont.getInfo() + "', "
         stringToExec += "departament = '"  + sovaVolont.getDepartament() + "' "
         stringToExec += "where id = " + sovaVolont.getId()
-        logging.info("updateVolunteer: " + stringToExec)
-        self.cursor.execute(stringToExec)
-        self.conn.commit()
+        self.execute(stringToExec)
+        #self.conn.commit()
     
     def selectVolunteerById(self, idDB):
         stringToExec = "select * from human_resources where id = " + str(idDB)
-        logging.info("selectVolunteerById: " + stringToExec)
-        self.cursor.execute(stringToExec)
-        getStr = str(self.cursor.fetchone())
+        getStr = str(self.execute(stringToExec).fetchone())
         getStr = getStr.replace("(", "")
         getStr = getStr.replace(")", "")
         getStr = getStr.replace("'", "")
-        logging.info(getStr)
-        logging.info("end selectVolunteerById;")
         arr = getStr.split(', ')
         return Volunteer(arr)
     
     def selectByDepartament(self, departament): 
         stringToExec = "select * from human_resources where departament = '" + departament + "'"
-        logging.info("selectByDepartament: " + stringToExec)
-        self.cursor.execute(stringToExec)
-        return self.cursor.fetchall()
+        return self.execute(stringToExec).fetchall()
     
     def deletFromVolunteeres(self, id):
         stringToExec = "delete from human_resources where id = " + str(id)
-        logging.info("deletFromVolunteeres: " + stringToExec)
-        self.cursor.execute(stringToExec)
-        self.conn.commit()
+        self.execute(stringToExec)
     
-    def stringArrConstructor(self):
+    def stringArrConstructor(self, cursor):
         endStr = []
-        firstDat = self.cursor.fetchone()
+        firstDat = cursor.fetchone()
         while firstDat is not None:
             firstDat = str(firstDat)
             firstDat = firstDat[2:-3]
             endStr.append(str(firstDat))
-            firstDat = self.cursor.fetchone()
+            firstDat = cursor.fetchone()
         return endStr
     
     def closeConnect(self):
         logging.info("closeConnect")
         self.conn.close()
-        
-        
-dtb = datBaseConnector()
     
 class GeneralFrame(Frame):
     value = 1
@@ -232,6 +233,7 @@ class GeneralFrame(Frame):
         y = (root.winfo_reqheight()) / 2
         top.wm_geometry("+%d+%d" % (x, y))     
         def createNew():
+            print("Check " + str(self.dbSova.emptyNick(nickField.get('1.0', END)[:-1])))
             if(self.dbSova.emptyNick(nickField.get('1.0', END)[:-1]) is None):
                 nickField.delete('1.0', END)
                 nickField.insert(1.0, "Введеный позывной уже используется, используйте другой")
