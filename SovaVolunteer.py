@@ -1,4 +1,4 @@
-versionPR = "SovaVolunteer 0.8.1(beta)"
+versionPR = "SovaVolunteer 0.8.2(beta)"
 versionDate = "28.12.18"
 changeList = [(1, "Первая версия))"),
               (2, "Скоро обновление))")]
@@ -127,6 +127,21 @@ class datBaseConnector():
         self.execute(stringToExec)
         #self.conn.commit()
     
+    def existNickInNickTable(self, sovaVolontCall):
+        stringToExec = "select * from empty_callsign where upper(callsign) = upper('"
+        stringToExec +=  sovaVolontCall + "') limit 1"
+        print(stringToExec)
+        temp = self.execute(stringToExec).fetchone()
+        print(temp)
+        print(temp != None)
+        return temp != None
+    
+    def existNickInPeopleTable(self, sovaVolontCall):
+        stringToExec = "select * from human_resources where upper(callsign) = upper('"
+        stringToExec +=  sovaVolontCall + "') limit 1"
+        temp = self.execute(stringToExec).fetchone()
+        return temp != None
+    
     def selectVolunteerById(self, idDB):
         stringToExec = "select * from human_resources where id = " + str(idDB)
         getStr = str(self.execute(stringToExec).fetchone())
@@ -249,13 +264,34 @@ class GeneralFrame(Frame):
         def cancel():
             top.destroy()
         
+        def checkNick():
+            checker = Toplevel(top)
+            checker.title("Проверка ника")
+            checker.geometry("400x80")
+            checkInCall = "Проверка на корректность позывного - "
+            checkInHumans = "Проверка на возможность назначения позывного - "
+            if(self.dbSova.existNickInNickTable(nickField.get('1.0', END)[:-1])):
+                checkInCall += "пройдено"
+            else:
+                checkInCall += "НЕ пройдено"
+            if(self.dbSova.existNickInPeopleTable(nickField.get('1.0', END)[:-1])):
+                checkInHumans += "НЕ пройдено"
+            else:
+                checkInHumans += "пройдено"
+            labelFCheck = Label(checker, text = checkInCall).pack()
+            labelSCheck = Label(checker, text = checkInHumans).pack()
+            
+        
         labelName = Label(top, text = 'ФИО:').grid(row = 0, padx=5, pady=5)
         nameField = Text(top, height=1, width=50, font='Arial 10', wrap = WORD)
         nameField.grid(row = 0, column = 1, columnspan = 3,  padx=5, pady=5)
 
         labelNick = Label(top, text = 'Позывной:').grid(row = 1, padx=5, pady=5)
-        nickField = Text(top, height=1, width=50, font='Arial 10', wrap = WORD)
-        nickField.grid(row = 1, column = 1, columnspan = 3,  padx=5, pady=5)
+        nickField = Text(top, height=1, width=35, font='Arial 10', wrap = WORD)
+        nickField.grid(row = 1, column = 1, columnspan = 2,  padx=5, pady=5)
+        
+        button_decine = Button(top, text = 'Проверить ник', command = checkNick)
+        button_decine.grid(row = 1, column = 3, padx=5, pady=5)
         
         labelInfo = Label(top, text = 'Дополнительная информация:').grid(row = 3, padx=5, pady=5)
         infoField = Text(top, height=10, width=50, font='Arial 10', wrap = WORD)
