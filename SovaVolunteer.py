@@ -1,7 +1,6 @@
-versionPR = "SovaVolunteer 0.8.2(beta)"
-versionDate = "28.12.18"
-changeList = [(1, "Первая версия))"),
-              (2, "Скоро обновление))")]
+versionPR = "SovaVolunteer 0.8.5(beta)"
+versionDate = "05.01.19"
+changeList = [(1, "Добавлена проверка на доступность \n ника по 2 таблицам")]
 updateLink = "https://drive.google.com/file/d/1uGX9LUnL_CMMwcHQt6xYuzchfIu0yrde/view"
 
 from tkinter import tix as tk
