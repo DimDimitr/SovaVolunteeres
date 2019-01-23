@@ -1,6 +1,7 @@
-versionPR = "SovaVolunteer 0.8.5(beta)"
-versionDate = "05.01.19"
-changeList = [(1, "Добавлена проверка на доступность \n ника по 2 таблицам")]
+versionPR = "SovaVolunteer 0.8.9(beta)"
+versionDate = "24.01.19"
+changeList = [(1, "убрана строгая проверка ников"),
+              (2, "добавлено модальное окно при \n совпадении ников")]
 updateLink = "https://drive.google.com/file/d/1uGX9LUnL_CMMwcHQt6xYuzchfIu0yrde/view"
 
 from tkinter import tix as tk
@@ -86,8 +87,8 @@ class datBaseConnector():
                    CONSTRAINT constraint_name UNIQUE(callsign))""") 
         self.execute("""create table if not exists empty_callsign
                    (id integer primary key autoincrement,
-                   callsign text not null,
-                   CONSTRAINT constraint_name UNIQUE(callsign))""")
+                   callsign text not null
+                   )""")
         
     def selectAllVolunteeres(self): 
         stringToExec = "select full_Name from human_resources"
@@ -124,7 +125,6 @@ class datBaseConnector():
         stringToExec += "departament = '"  + sovaVolont.getDepartament() + "' "
         stringToExec += "where id = " + sovaVolont.getId()
         self.execute(stringToExec)
-        #self.conn.commit()
     
     def existNickInNickTable(self, sovaVolontCall):
         stringToExec = "select * from empty_callsign where upper(callsign) = upper('"
@@ -239,6 +239,26 @@ class GeneralFrame(Frame):
         top.focus_set()
         top.wait_window()
         
+    def acceptOrRejectModal(self, textAlert, acceptF, rejectF):
+        acceptOrReject = Toplevel()
+        acceptOrReject.title("Подтверждение действия")
+        widthFrame = 400
+        if(len(textAlert) * 8 > widthFrame):
+            widthFrame = len(textAlert) * 8
+        acceptOrReject.geometry(str(widthFrame) + "x80")
+        labelTableName = Label(acceptOrReject, text=textAlert)
+        labelTableName.grid(row = 0, column = 0, columnspan = 3, padx=5, pady=5) 
+        def accept():
+            acceptF()
+            acceptOrReject.destroy()
+        def reject():
+            acceptOrReject.destroy()
+            rejectF()
+        button_decine = Button(acceptOrReject, text = 'Отменить', command = reject)
+        button_decine.grid(row = 1, column = 1, padx=5, pady=5) 
+        button_accept = Button(acceptOrReject, text = 'Подтвердить', command = accept)
+        button_accept.grid(row = 1, column = 2, padx=5, pady=5) 
+        
     def createNewVolunteer(self):
         top = Toplevel()
         top.title("Создание волонтера")
@@ -247,19 +267,21 @@ class GeneralFrame(Frame):
         y = (root.winfo_reqheight()) / 2
         top.wm_geometry("+%d+%d" % (x, y))     
         def createNew():
-            print("Check " + str(self.dbSova.emptyNick(nickField.get('1.0', END)[:-1])))
-            if(self.dbSova.emptyNick(nickField.get('1.0', END)[:-1]) is None):
-                nickField.delete('1.0', END)
-                nickField.insert(1.0, "Введеный позывной уже используется, используйте другой")
-            else:
-                if (nameField.get('1.0', END)[:-1] != ''):
-                    self.dbSova.insertNewVolunteer([nameField.get('1.0', END)[:-1],
+            def insertNew():
+                self.dbSova.insertNewVolunteer([nameField.get('1.0', END)[:-1],
                                                     nickField.get('1.0', END)[:-1],
                                                     infoField.get('1.0', END)[:-1],
                                                     depField.get('1.0', END)[:-1]])
-                    self.dbSova.deleteNick(nickField.get('1.0', END)[:-1])
+                self.dbSova.deleteNick(nickField.get('1.0', END)[:-1])
                 self.updateTreeView()
                 top.destroy()
+            def tryAgain():
+                return
+            if(self.dbSova.existNickInPeopleTable(nickField.get('1.0', END)[:-1])):
+                self.acceptOrRejectModal("Введеный позывной уже используется, все равно добавить?", insertNew, tryAgain)
+            else:
+                if (nameField.get('1.0', END)[:-1] != ''):
+                    insertNew()
         def cancel():
             top.destroy()
         
@@ -304,9 +326,9 @@ class GeneralFrame(Frame):
         button_decine.grid(row = 6, column = 2, padx=5, pady=5)
         button_accept = Button(top, text = 'Создать', command = createNew)
         button_accept.grid(row = 6, column = 1, padx=5, pady=5)
-        top.grab_set()
-        top.focus_set()
-        top.wait_window()
+#        top.grab_set()
+#        top.focus_set()
+#        top.wait_window()
     
     def configTreeView(self):
         self.tree = ttk.Treeview(self)
