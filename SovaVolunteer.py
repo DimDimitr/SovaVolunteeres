@@ -1,4 +1,4 @@
-versionPR = "SovaVolunteer 0.8.9(beta)"
+versionPR = "SovaVolunteer 0.9(beta)"
 versionDate = "24.01.19"
 changeList = [(1, "убрана строгая проверка ников"),
               (2, "добавлено модальное окно при \n совпадении ников")]
