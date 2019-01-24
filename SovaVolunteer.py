@@ -2,7 +2,7 @@ versionPR = "SovaVolunteer 0.95(beta)"
 versionDate = "25.01.19"
 changeList = [(1, "убрана строгая проверка ников"),
               (2, "добавлено модальное окно при \n совпадении ников"),
-              (2, "повышена стабильность работы")]
+              (3, "повышена стабильность работы")]
 updateLink = "https://drive.google.com/file/d/1uGX9LUnL_CMMwcHQt6xYuzchfIu0yrde/view"
 
 from tkinter import tix as tk
