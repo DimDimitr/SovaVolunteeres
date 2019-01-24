@@ -1,7 +1,8 @@
-versionPR = "SovaVolunteer 0.9(beta)"
-versionDate = "24.01.19"
+versionPR = "SovaVolunteer 0.95(beta)"
+versionDate = "25.01.19"
 changeList = [(1, "убрана строгая проверка ников"),
-              (2, "добавлено модальное окно при \n совпадении ников")]
+              (2, "добавлено модальное окно при \n совпадении ников"),
+              (2, "повышена стабильность работы")]
 updateLink = "https://drive.google.com/file/d/1uGX9LUnL_CMMwcHQt6xYuzchfIu0yrde/view"
 
 from tkinter import tix as tk
@@ -92,7 +93,6 @@ class datBaseConnector():
         elif(returnMode == 'strCostr'):
             result = self.stringArrConstructor(self.cursor)
         self.closeConnect()
-        print(str(result))
         return result
         
     def creator(self):
@@ -171,7 +171,6 @@ class datBaseConnector():
         getStr = getStr.replace(")", "")
         getStr = getStr.replace("'", "")
         arr = getStr.split(', ')
-        print('problem ' + str(arr))
         return Volunteer(arr)
     
     def selectByDepartament(self, departament): 
