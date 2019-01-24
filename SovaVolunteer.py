@@ -1,17 +1,22 @@
-versionPR = "SovaVolunteer 0.9(beta)"
-versionDate = "24.01.19"
+versionPR = "SovaVolunteer 0.95(beta)"
+versionDate = "25.01.19"
 changeList = [(1, "убрана строгая проверка ников"),
-              (2, "добавлено модальное окно при \n совпадении ников")]
+              (2, "добавлено модальное окно при \n совпадении ников"),
+              (3, "повышена стабильность работы")]
 updateLink = "https://drive.google.com/file/d/1uGX9LUnL_CMMwcHQt6xYuzchfIu0yrde/view"
 
 from tkinter import tix as tk
-
+import copy
 import sqlite3
 from tkinter import *
 from tkinter import ttk
 import logging
 import webbrowser
 import time
+
+#1 - release/development
+#2 - update test data
+modSet = 1
 
 # add filemode="w" to overwrite
 
@@ -54,7 +59,6 @@ def errorFrame(errorText):
     labelVersionData.pack(fill=BOTH, padx=5, pady=5)
     button_accept = Button(errorF, text = 'Ok', command = closeThisErrorFrame)
     button_accept.pack(padx=5, pady=5)
-    
 
 class datBaseConnector():
     def __init__(self): 
@@ -63,19 +67,33 @@ class datBaseConnector():
         self.cursor = self.conn.cursor()
         self.creator()      
     
-    def execute(self, query, param = None):
+    #returnMode:
+    #fetchOne
+    #fetchAll
+    #strCostr
+    def execute(self, query, param = None, returnMode = ''):
         logging.info(query + " " + (str(param)))
+        self.conn = sqlite3.connect('SovaVolunteeres.sqlite', timeout=100)
+        self.cursor = self.conn.cursor()
         try:
             if param == None:
                 self.cursor.execute(query)
             else:
                 self.cursor.execute(query, param)
-                self.conn.commit()
+            self.conn.commit()
         except Exception as err:
             logging.error('execute failed: %s : %s' % (query, str(err)))
             errorFrame(str(err))
         cursorT = self.cursor
-        return cursorT
+        result = None
+        if(returnMode == 'fetchOne'):
+            result = self.cursor.fetchone()
+        elif(returnMode == 'fetchAll'):
+            result = self.cursor.fetchall()
+        elif(returnMode == 'strCostr'):
+            result = self.stringArrConstructor(self.cursor)
+        self.closeConnect()
+        return result
         
     def creator(self):
         self.execute("""create table if not exists human_resources
@@ -90,9 +108,19 @@ class datBaseConnector():
                    callsign text not null
                    )""")
         
+    def createTestData(self):
+        self.execute("delete from human_resources")
+        #имя, позывной, инфо, отряд
+        departaments = ['Тверь', 'Ржев', 'Кимры', 'Конаково']
+        for dapart in departaments:
+            i = 0
+            while i < 10:
+                self.insertNewVolunteer(['Имя' + dapart + str(i), dapart + str(i), 'info ' + str(i), dapart])
+                i += 1
+        
     def selectAllVolunteeres(self): 
         stringToExec = "select full_Name from human_resources"
-        return self.stringArrConstructor(self.execute(stringToExec))
+        return self.execute(stringToExec, returnMode = 'strCostr')
     
     def insertNewVolunteer(self, insertData):
         stringToExec = "insert into human_resources values(NULL,?,?,?,?)"
@@ -102,9 +130,9 @@ class datBaseConnector():
         stringToExec = "insert into empty_callsign values(NULL, '" + nick + "')"
         self.execute(stringToExec)
             
-    def emptyNick(self, checkNick):
-        stringToExec = "select * from empty_callsign where callsign = '" + checkNick + "'"
-        return self.execute(stringToExec).fetchone()
+    def emptyNick(self, checkNickState):
+        stringToExec = "select * from empty_callsign where callsign = '" + checkNickState + "'"
+        return self.execute(stringToExec, returnMode = 'fetchOne')
     
     def deleteNick(self, nick):
         stringToExec = "delete from empty_callsign where callsign = '" + nick + "'"
@@ -112,11 +140,11 @@ class datBaseConnector():
     
     def selectAllUniqDepartaments(self):
         stringToExec = "select distinct departament from human_resources"
-        return self.stringArrConstructor(self.execute(stringToExec))
+        return self.execute(stringToExec, returnMode = 'strCostr')
     
     def selectByName(self, userName): 
         stringToExec = "select full_name, callsign, additional_information from human_resources where full_name = '" + userName + "'"
-        return self.stringArrConstructor(self.execute(stringToExec))
+        return self.execute(stringToExec,  returnMode = 'strCostr')
     
     def updateVolunteer(self, sovaVolont):
         stringToExec = "update human_resources set full_name = '"  + sovaVolont.getName() + "', "
@@ -129,21 +157,16 @@ class datBaseConnector():
     def existNickInNickTable(self, sovaVolontCall):
         stringToExec = "select * from empty_callsign where upper(callsign) = upper('"
         stringToExec +=  sovaVolontCall + "') limit 1"
-        print(stringToExec)
-        temp = self.execute(stringToExec).fetchone()
-        print(temp)
-        print(temp != None)
-        return temp != None
+        return self.execute(stringToExec, returnMode = 'fetchOne') != None
     
     def existNickInPeopleTable(self, sovaVolontCall):
         stringToExec = "select * from human_resources where upper(callsign) = upper('"
         stringToExec +=  sovaVolontCall + "') limit 1"
-        temp = self.execute(stringToExec).fetchone()
-        return temp != None
+        return self.execute(stringToExec, returnMode = 'fetchOne') != None
     
     def selectVolunteerById(self, idDB):
         stringToExec = "select * from human_resources where id = " + str(idDB)
-        getStr = str(self.execute(stringToExec).fetchone())
+        getStr = str(self.execute(stringToExec, returnMode = 'fetchOne'))
         getStr = getStr.replace("(", "")
         getStr = getStr.replace(")", "")
         getStr = getStr.replace("'", "")
@@ -151,8 +174,8 @@ class datBaseConnector():
         return Volunteer(arr)
     
     def selectByDepartament(self, departament): 
-        stringToExec = "select * from human_resources where departament = '" + departament + "'"
-        return self.execute(stringToExec).fetchall()
+        stringToExec = "select * from human_resources where departament = '" + departament + "' order by full_name asc"
+        return self.execute(stringToExec, returnMode = 'fetchAll')
     
     def deletFromVolunteeres(self, id):
         stringToExec = "delete from human_resources where id = " + str(id)
@@ -178,8 +201,11 @@ class GeneralFrame(Frame):
         Frame.__init__(self, parent)   
         self.parent = parent
         self.dbSova = datBaseConnector()
+        if(modSet == 2):
+            self.dbSova.execute("select * from human_resources")
+            self.dbSova.createTestData()
         self.initUI()
-
+        
     def initUI(self):
         self.dbSova.creator()
         self.parent.title("SovaVolunteer")          
@@ -239,25 +265,27 @@ class GeneralFrame(Frame):
         top.focus_set()
         top.wait_window()
         
-    def acceptOrRejectModal(self, textAlert, acceptF, rejectF):
+    def acceptOrRejectModal(self, textAlert, acceptF = None, rejectF = None):
         acceptOrReject = Toplevel()
         acceptOrReject.title("Подтверждение действия")
-        widthFrame = 400
-        if(len(textAlert) * 8 > widthFrame):
-            widthFrame = len(textAlert) * 8
-        acceptOrReject.geometry(str(widthFrame) + "x80")
         labelTableName = Label(acceptOrReject, text=textAlert)
-        labelTableName.grid(row = 0, column = 0, columnspan = 3, padx=5, pady=5) 
+        widthFrame = 170
+        if(labelTableName.winfo_reqwidth() + 10 > widthFrame):
+            widthFrame = labelTableName.winfo_reqwidth() + 10
+        acceptOrReject.geometry(str(widthFrame) + "x80")
+        labelTableName.grid(row = 0, column = 0, columnspan = 3, padx=5, pady=5)
         def accept():
-            acceptF()
+            if(acceptF is not None):
+                acceptF()
             acceptOrReject.destroy()
         def reject():
+            if(rejectF is not None):
+                rejectF()
             acceptOrReject.destroy()
-            rejectF()
         button_decine = Button(acceptOrReject, text = 'Отменить', command = reject)
-        button_decine.grid(row = 1, column = 1, padx=5, pady=5) 
+        button_decine.grid(row = 1, column = 2, padx=5, pady=5) 
         button_accept = Button(acceptOrReject, text = 'Подтвердить', command = accept)
-        button_accept.grid(row = 1, column = 2, padx=5, pady=5) 
+        button_accept.grid(row = 1, column = 1, padx=5, pady=5) 
         
     def createNewVolunteer(self):
         top = Toplevel()
@@ -286,23 +314,12 @@ class GeneralFrame(Frame):
             top.destroy()
         
         def checkNick():
-            checker = Toplevel(top)
-            checker.title("Проверка ника")
-            checker.geometry("400x80")
-            checkInCall = "Проверка на корректность позывного - "
-            checkInHumans = "Проверка на возможность назначения позывного - "
-            if(self.dbSova.existNickInNickTable(nickField.get('1.0', END)[:-1])):
-                checkInCall += "пройдено"
-            else:
-                checkInCall += "НЕ пройдено"
             if(self.dbSova.existNickInPeopleTable(nickField.get('1.0', END)[:-1])):
-                checkInHumans += "НЕ пройдено"
+                checkCall = "Данный позывной уже используется!"  
             else:
-                checkInHumans += "пройдено"
-            labelFCheck = Label(checker, text = checkInCall).pack()
-            labelSCheck = Label(checker, text = checkInHumans).pack()
-            
-        
+                checkCall = "Позывной доступен!"
+            self.acceptOrRejectModal(checkCall)
+             
         labelName = Label(top, text = 'ФИО:').grid(row = 0, padx=5, pady=5)
         nameField = Text(top, height=1, width=50, font='Arial 10', wrap = WORD)
         nameField.grid(row = 0, column = 1, columnspan = 3,  padx=5, pady=5)
@@ -316,19 +333,16 @@ class GeneralFrame(Frame):
         
         labelInfo = Label(top, text = 'Дополнительная информация:').grid(row = 3, padx=5, pady=5)
         infoField = Text(top, height=10, width=50, font='Arial 10', wrap = WORD)
-        infoField.grid(row = 2, column = 1, rowspan=3, columnspan = 3, padx=5, pady=5)
+        infoField.grid(row = 3, column = 1, rowspan=3, columnspan = 3, padx=5, pady=5)
                 
         labelDep = Label(top, text = 'Подразделение:').grid(row = 5, padx=5, pady=5)
         depField = Text(top, height=1, width=50, font='Arial 10', wrap = WORD)
-        depField.grid(row = 5, column = 1, columnspan = 3,  padx=5, pady=5)
+        depField.grid(row = 6, column = 1, columnspan = 3,  padx=5, pady=5)
 
         button_decine = Button(top, text = 'Отмена', command = cancel)
-        button_decine.grid(row = 6, column = 2, padx=5, pady=5)
+        button_decine.grid(row = 7, column = 2, padx=5, pady=5)
         button_accept = Button(top, text = 'Создать', command = createNew)
-        button_accept.grid(row = 6, column = 1, padx=5, pady=5)
-#        top.grab_set()
-#        top.focus_set()
-#        top.wait_window()
+        button_accept.grid(row = 7, column = 1, padx=5, pady=5)
     
     def configTreeView(self):
         self.tree = ttk.Treeview(self)
