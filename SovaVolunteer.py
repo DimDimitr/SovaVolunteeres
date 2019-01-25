@@ -1,8 +1,10 @@
-versionPR = "SovaVolunteer 0.95(beta)"
+versionPR = "SovaVolunteer 0.96(beta)"
 versionDate = "25.01.19"
 changeList = [(1, "убрана строгая проверка ников"),
               (2, "добавлено модальное окно при \n совпадении ников"),
-              (3, "повышена стабильность работы")]
+              (3, "повышена стабильность работы"),
+              (4, "Добавлена темная тема"),
+              (5, "Добавлены иконки")]
 updateLink = "https://drive.google.com/file/d/1uGX9LUnL_CMMwcHQt6xYuzchfIu0yrde/view"
 
 from libraries.DatBaseConnector import datBaseConnector
@@ -92,7 +94,7 @@ class GeneralFrame(Frame):
     def showAbout(self):
         top = Toplevel()
         top.title("About SovaVolunteer")
-        top.geometry("300x240")
+        top.geometry("300x280")
         labelVersion = Label(top, text=("Версия сборки: " + versionPR))
         labelVersion.pack(padx=5, pady=5)
         labelProgrammist = Label(top, text=("Efremov Dmitry© " + versionDate))
