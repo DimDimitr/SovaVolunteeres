@@ -5,29 +5,18 @@ changeList = [(1, "убрана строгая проверка ников"),
               (3, "повышена стабильность работы")]
 updateLink = "https://drive.google.com/file/d/1uGX9LUnL_CMMwcHQt6xYuzchfIu0yrde/view"
 
+from libraries.DatBaseConnector import datBaseConnector
+from libraries.Settings import SettingsList
 from tkinter import tix as tk
 import copy
-import sqlite3
 from tkinter import *
 from tkinter import ttk
-import logging
 import webbrowser
 import time
 
 #1 - release/development
 #2 - update test data
 modSet = 1
-
-# add filemode="w" to overwrite
-
-logging.basicConfig(filename="sova.log", level=logging.INFO, format = "%(asctime)s %(levelname)s - %(message)s") 
-
-#logging.debug("")
-#logging.info("")
-#logging.error("")
-
-def stopLogging():
-    logging.shutdown()
 
 class Volunteer():
     def __init__(self, strinFromDB):
@@ -60,140 +49,7 @@ def errorFrame(errorText):
     button_accept = Button(errorF, text = 'Ok', command = closeThisErrorFrame)
     button_accept.pack(padx=5, pady=5)
 
-class datBaseConnector():
-    def __init__(self): 
-        logging.info("init connection")
-        self.conn = sqlite3.connect('SovaVolunteeres.sqlite', timeout=100)
-        self.cursor = self.conn.cursor()
-        self.creator()      
-    
-    #returnMode:
-    #fetchOne
-    #fetchAll
-    #strCostr
-    def execute(self, query, param = None, returnMode = ''):
-        logging.info(query + " " + (str(param)))
-        self.conn = sqlite3.connect('SovaVolunteeres.sqlite', timeout=100)
-        self.cursor = self.conn.cursor()
-        try:
-            if param == None:
-                self.cursor.execute(query)
-            else:
-                self.cursor.execute(query, param)
-            self.conn.commit()
-        except Exception as err:
-            logging.error('execute failed: %s : %s' % (query, str(err)))
-            errorFrame(str(err))
-        cursorT = self.cursor
-        result = None
-        if(returnMode == 'fetchOne'):
-            result = self.cursor.fetchone()
-        elif(returnMode == 'fetchAll'):
-            result = self.cursor.fetchall()
-        elif(returnMode == 'strCostr'):
-            result = self.stringArrConstructor(self.cursor)
-        self.closeConnect()
-        return result
-        
-    def creator(self):
-        self.execute("""create table if not exists human_resources
-                   (id integer primary key autoincrement,
-                   full_name text not null,
-                   callsign text,
-                   additional_information text,
-                   departament text,
-                   CONSTRAINT constraint_name UNIQUE(callsign))""") 
-        self.execute("""create table if not exists empty_callsign
-                   (id integer primary key autoincrement,
-                   callsign text not null
-                   )""")
-        
-    def createTestData(self):
-        self.execute("delete from human_resources")
-        #имя, позывной, инфо, отряд
-        departaments = ['Тверь', 'Ржев', 'Кимры', 'Конаково']
-        for dapart in departaments:
-            i = 0
-            while i < 10:
-                self.insertNewVolunteer(['Имя' + dapart + str(i), dapart + str(i), 'info ' + str(i), dapart])
-                i += 1
-        
-    def selectAllVolunteeres(self): 
-        stringToExec = "select full_Name from human_resources"
-        return self.execute(stringToExec, returnMode = 'strCostr')
-    
-    def insertNewVolunteer(self, insertData):
-        stringToExec = "insert into human_resources values(NULL,?,?,?,?)"
-        self.execute(stringToExec, insertData)
-        
-    def isertNick(self, nick):
-        stringToExec = "insert into empty_callsign values(NULL, '" + nick + "')"
-        self.execute(stringToExec)
-            
-    def emptyNick(self, checkNickState):
-        stringToExec = "select * from empty_callsign where callsign = '" + checkNickState + "'"
-        return self.execute(stringToExec, returnMode = 'fetchOne')
-    
-    def deleteNick(self, nick):
-        stringToExec = "delete from empty_callsign where callsign = '" + nick + "'"
-        self.execute(stringToExec)
-    
-    def selectAllUniqDepartaments(self):
-        stringToExec = "select distinct departament from human_resources"
-        return self.execute(stringToExec, returnMode = 'strCostr')
-    
-    def selectByName(self, userName): 
-        stringToExec = "select full_name, callsign, additional_information from human_resources where full_name = '" + userName + "'"
-        return self.execute(stringToExec,  returnMode = 'strCostr')
-    
-    def updateVolunteer(self, sovaVolont):
-        stringToExec = "update human_resources set full_name = '"  + sovaVolont.getName() + "', "
-        stringToExec += "callsign = '"  + sovaVolont.getNick() + "', "
-        stringToExec += "additional_information = '"  + sovaVolont.getInfo() + "', "
-        stringToExec += "departament = '"  + sovaVolont.getDepartament() + "' "
-        stringToExec += "where id = " + sovaVolont.getId()
-        self.execute(stringToExec)
-    
-    def existNickInNickTable(self, sovaVolontCall):
-        stringToExec = "select * from empty_callsign where upper(callsign) = upper('"
-        stringToExec +=  sovaVolontCall + "') limit 1"
-        return self.execute(stringToExec, returnMode = 'fetchOne') != None
-    
-    def existNickInPeopleTable(self, sovaVolontCall):
-        stringToExec = "select * from human_resources where upper(callsign) = upper('"
-        stringToExec +=  sovaVolontCall + "') limit 1"
-        return self.execute(stringToExec, returnMode = 'fetchOne') != None
-    
-    def selectVolunteerById(self, idDB):
-        stringToExec = "select * from human_resources where id = " + str(idDB)
-        getStr = str(self.execute(stringToExec, returnMode = 'fetchOne'))
-        getStr = getStr.replace("(", "")
-        getStr = getStr.replace(")", "")
-        getStr = getStr.replace("'", "")
-        arr = getStr.split(', ')
-        return Volunteer(arr)
-    
-    def selectByDepartament(self, departament): 
-        stringToExec = "select * from human_resources where departament = '" + departament + "' order by full_name asc"
-        return self.execute(stringToExec, returnMode = 'fetchAll')
-    
-    def deletFromVolunteeres(self, id):
-        stringToExec = "delete from human_resources where id = " + str(id)
-        self.execute(stringToExec)
-    
-    def stringArrConstructor(self, cursor):
-        endStr = []
-        firstDat = cursor.fetchone()
-        while firstDat is not None:
-            firstDat = str(firstDat)
-            firstDat = firstDat[2:-3]
-            endStr.append(str(firstDat))
-            firstDat = cursor.fetchone()
-        return endStr
-    
-    def closeConnect(self):
-        logging.info("closeConnect")
-        self.conn.close()
+
     
 class GeneralFrame(Frame):
     value = 1
@@ -214,13 +70,24 @@ class GeneralFrame(Frame):
         self.id = None
         
         self.configTreeView()
-        
         frame = Frame(self)
         frame.pack()
+        
+        if(darkTheme):
+            self.parent.configure(background = darkThemeColorList['background'])
+            self.configure(background = darkThemeColorList['background'])
+            frame.configure(background = darkThemeColorList['background'])
+        
+        button_accept_img = PhotoImage(file="src/add.png")
         button_accept = Button(frame, text = 'Добавить волонтера', command = self.createNewVolunteer)
+        button_accept.config(image = button_accept_img, width="36",height="36", background="#96cafb")
         button_accept.pack(side = LEFT, padx=5, pady=5) 
-        button_help = Button(frame, text = '?', command = self.showAbout)
-        button_help.pack(side = RIGHT, padx=5, pady=5) 
+        
+        button_about_img = PhotoImage(file="src/about.png")
+        button_about = Button(frame, text = '?', command = self.showAbout)
+        button_about.config(image = button_about_img, width="36",height="36", background="#96cafb")
+        button_about.pack(side = RIGHT, padx=5, pady=5) 
+        frame.mainloop()
     
     def showAbout(self):
         top = Toplevel()
@@ -239,6 +106,10 @@ class GeneralFrame(Frame):
             versionChangeStr += str(changeEl[0]) + ". " + changeEl[1] + "\n" 
         labelVersionData = Label(top, text=(versionChangeStr))
         labelVersionData.pack(padx=5, pady=5)
+        def callModal():
+            self.acceptOrRejectModal('Сменить цвета? Потребуется перезагрузка.', settingsList.changeDarkColorThemeFlag)
+        button_theme = Button(top, text = 'Сменить цвета', command = callModal)
+        button_theme.pack(side=BOTTOM, padx=25, pady=5) 
         
     
     def funcDelete(self):
@@ -431,7 +302,19 @@ class GeneralFrame(Frame):
             self.id = sender.item(curItem)['tags'][0]
 
 root=Tk()
+root.iconbitmap('src\sova.ico')
 var = StringVar()
 root.geometry("800x500")
+settingsList = SettingsList()
+darkTheme = settingsList.getDarkColorThemeFlag()
+if(darkTheme):
+    style = ttk.Style(root)
+    style.theme_use("clam")
+    darkThemeColorList = settingsList.getDarkThemeColors()
+    style.configure("Treeview", background = darkThemeColorList['background'], 
+                fieldbackground = darkThemeColorList['fieldbackground'],
+                foreground = darkThemeColorList['foreground'])
+
+
 GeneralFrame(root)    
 root.mainloop()
